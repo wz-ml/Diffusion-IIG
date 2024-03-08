@@ -34,14 +34,33 @@ class Conv2dUnweighted(nn.Module):
             dim_mid = dim_out
         self.Conv2dUnweighted = nn.Sequential(
             nn.Conv2d(dim_in, dim_mid, kernel_size=3, padding=1, bias=False),
-            # need to finish the rest
+            nn.BatchNorm2d(dim_mid),
+            nn.ReLU(inplace=True),
+            nn.Conv2d(dim_mid, dimOut, kernel_size=3, padding=1, bias=False),
+            nn.BatchNorm2d(dim_out),
+            nn.ReLU(inplace=True)
         )
 
+    def forward(self, x):
+        return self.double_conv(x)
     
-class UpScale(nn.Module):
-    def __init__(self, dim_in, dim_out=None):
+class DownScale(nn.Module):
+    # maxpool -> double conv
+    def __init__(self, dim_in, dim_out):
         super().__init__()
+        self.maxpool_conv2d = nn.Sequential(
+            nn.MaxPool2d(2),
+            DoubleConv(dim_in, dim_out)
+        )
 
     def forward(self, x):
-        # need to complete
+        return self.maxpool_conv2d(x)
+    
+class UpScale(nn.Module):h
+    def __init__(self, dim_in, dim_out=None):
+        super().__init__()
+        
+
+    def forward(self, x):
+
         return None
