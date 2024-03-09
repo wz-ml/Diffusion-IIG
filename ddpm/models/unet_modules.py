@@ -1,6 +1,7 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+import einops
 
 """
 This file defines different building blocks for the
@@ -46,6 +47,7 @@ class DoubleConv2dUnweighted(nn.Module):
     
 class DownScale(nn.Module):
     # maxpool -> double conv
+    # this is different from DownSample. I take DownSample from annotated diffusion
     def __init__(self, dim_in, dim_out):
         super().__init__()
         self.maxpool_conv2d = nn.Sequential(
@@ -57,6 +59,8 @@ class DownScale(nn.Module):
         return self.maxpool_conv2d(x)
     
 class UpScale(nn.Module):
+    # can also do bilinear interpolation but I opted for conv2 transpose
+    # this is different from UpSample. I take UpSample from annotated diffusion
     def __init__(self, dim_in, dim_out):
         super().__init__()
         self.up = nn.ConvTranspose2d(dim_in, dim_in // 2, kernel_size=2, stride=2)
@@ -77,10 +81,28 @@ class UpScale(nn.Module):
 
         return x
 
-class OutConv(nn.Module):
+class UpSample(nn.Module):
+    # This is taken from annotated diffusion
     def __init__(self, dim_in, dim_out):
-        super(OutConv, self).__init__()
-        self.conv = nn.Conv2d(dim_in, dim_out, kernel_size=1)
+        super(UpSample, self).__init__()
+        self.upsample = nn.Sequential(
+            nn.UpSample(scale_factor=2, mode='nearest'),
+            nn.Conv2d(dim_in, default(dim_out, dim_in), 3, padding=1),
+        )
 
     def forward(self, x):
-        return self.conv(x)
+        return self.upsample(x)
+
+class DownSample(nn.Module):
+    # This is taken from annotated diffusion
+    def __init__(self, dim_in, dim_out=None):
+        super(DownSample, self).__init__()
+        self.downsample = nn.Sequential(
+            nn.Conv2d(dim_in * 4, default(dim_out, dim_in), 1)
+        )
+
+class WideResNet(nn.Module):
+    # https://arxiv.org/pdf/1605.07146.pdf
+    # the authors 
+    def __int__(self, dim_in, dim_out):
+        
