@@ -333,4 +333,21 @@ class RelativePositionEmbeddings(nn.Module):
         rel_pos = rel_pos.transpose(0, 1)
         return self.embeddings(rel_pos + self.max_rel_pos)
 
+"""
+Attention variants
+- regular
+- linear
+TO IMPLEMENT: CrossAttention
+- 
+"""
 
+class Attention(nn.Module):
+    def __init__(self, dim, heads=4, dim_head=32):
+        super().__init__()
+        self.scale = dim_head**-0.5
+        self.heads = heads
+        hidden_dim = dim_head * heads
+        self.to_qkv = nn.Conv2d(dim, hidden_dim * 3, 1, bias=False)
+        self.to_out = nn.Conv2d(hidden_dim, dim, 1)
+
+    def forward()
