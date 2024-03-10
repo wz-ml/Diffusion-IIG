@@ -168,7 +168,7 @@ class WideUnweightedResNetBlock(nn.Module):
 
         self.block1 = WideUnweightedBlock(dim_in, dim_out)
         self.block2 = WideUnweightedBlock(dim_out, dim_out)
-        self.res_conv = nn.Conv2d(dim_in, dim_out, 1) if dim! = dim_out else nn.Identity()
+        self.res_conv = nn.Conv2d(dim_in, dim_out, 1) if dim != dim_out else nn.Identity()
 
     def forward(self, x, time_emb=None):
         scale_shift = None
@@ -223,6 +223,8 @@ class WideWeightedBlock(nn.Module):
         if exists(scale_shift):
             scale, shift = scale_shift
             x = x * (scale + 1) + shift
+        else:
+            None
 
         x = self.act(x)
         return x
