@@ -98,11 +98,58 @@ class DownSample(nn.Module):
     def __init__(self, dim_in, dim_out=None):
         super(DownSample, self).__init__()
         self.downsample = nn.Sequential(
-            nn.Conv2d(dim_in * 4, default(dim_out, dim_in), 1)
+            Rearrange("b c (h p1) (w p2) -> b (c p1 p2) h w", p1=2, p2=2),
+            nn.Conv2d(dim_in * 4, default(dim_out, dim_in), 1),
         )
 
-class WideResNet(nn.Module):
-    # https://arxiv.org/pdf/1605.07146.pdf
-    # the authors 
-    def __int__(self, dim_in, dim_out):
+
+"""
+The following describes an implementation of a standard (unweighted) WideResNet
+block. Annotated diffusion uses a 'weight standardized' conv2d. We should try both.
+"""
+
+# I define this below purely to differentiate and so code is more readable.
+def exists(x):
+    return x is not None
+
+
+class UnweightedConv2d(nn.Conv2d):
+    def forward(self, x):
+        return F.conv2d(
+            x,
+            self.weight,
+            self.bias,
+            self.stride,
+            self.padding,
+            self.dilation,
+            self.groups,
+        )
+
+class WideUnweightedBlock(nn.Module):
+    # as opposed to wide WEIGHTED block
+    def __init__(self, dim_in, dim_out):
+        super().__init__()
+        self.proj = UnweightedConv2d(dim_in, dim_out, 3, padding=1)
+        self.act = nn.ReLU(inplace=True)
+
+    def forward(self, x, scale_shift=None):
+        x = self.proj(x)
+
+        if exists(scale_shift):
+            scale, shift = scale_shift
+            x = x* (scale + 1) + shift
+
+        x = self.act(x)
+        return x
         
+class WideUnweightedResNetBlock(nn.Module):
+
+    def __init__(self, dim_in, dim_out, *, time_emb_dim=None):
+        super().__init__()
+        self.mlp = (
+            nn.Sequential(
+                nn.ReLU(inplace=True),
+                nn.Linear(time_emb_dim, dim_out * 2)
+            )
+            if exists(time_emb_dim) else None
+        )
