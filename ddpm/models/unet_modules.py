@@ -13,8 +13,6 @@ I use snake_case convention for variable, function and method names
 I use PascalCase for class names
 """
 
-
-
 #Network helpers are defined below
 def exists(x):
     return x is not None
@@ -26,7 +24,6 @@ def default(val, d):
 
 """
 More standard Unet blocks are defined below
-
 """
 
 class Residual(nn.Module):
@@ -187,6 +184,7 @@ The following is an implementation largely taken from annotated diffusion that u
 a weight standardized convolutional layer which apparently works better with
 group normalization
 https://arxiv.org/abs/1903.10520
+FORWARD PASS HAS NOT BEEN TESTED YET
 """
 
 class WeightStandardizedConv2d(nn.Conv2d):
@@ -335,4 +333,100 @@ class RelativePositionEmbeddings(nn.Module):
         rel_pos = rel_pos.transpose(0, 1)
         return self.embeddings(rel_pos + self.max_rel_pos)
 
+"""
+Attention variants
+- attention
+- linear attention
+- crossAttention
+- attention and linear attention are from annotated diffusion
+NOTE: Have not tested thoroughly yet
+"""
 
+class Attention(nn.Module):
+    def __init__(self, dim, heads=4, dim_head=32):
+        super().__init__()
+        self.scale = dim_head**-0.5
+        self.heads = heads
+        hidden_dim = dim_head * heads
+        self.to_qkv = nn.Conv2d(dim, hidden_dim * 3, 1, bias=False)
+        self.to_out = nn.Conv2d(hidden_dim, dim, 1)
+
+    def forward(self, x):
+        b, c, h, w = x.shape
+        qkv = self.to_qkv(x).chunk(3, dim=1)
+        q, k, v = map(
+            lambda t: rearrange(t, "b (h c) x y -> b h c (x y)", h=self.heads), qkv
+        )
+        q = q * self.scale
+
+        sim = einsum("b h d i, b h d j -> b h i j", q, k)
+        sim = sim - sim.amax(dim=-1, keepdim=True).detach()
+        attn = sim.softmax(dim=-1)
+
+        out = einsum("b h i j, b h d j -> b h i d", attn, v)
+        out = rearrange(out, "b h (x y) d -> b (h d) x y", x=h, y=w)
+
+        return self.to_out(out)
+
+class LinearAttention(nn.Module):
+    def __init__(self, dim, heads=4, dim_head=32):
+        super().__init__()
+        self.scale = dim_head**-0.5
+        self.heads = heads
+        hidden_dim = dim_head * heads
+        self.to_qkv = nn.Conv2d(dim, hidden_dim * 3, 1, bias=False)
+        self.to_out = nn.Sequential(nn.Conv2d(hidden_dim, dim, 1),
+                                    nn.GroupNorm(1, dim))
+
+    def forward(self, x):
+        b, c, h, w = x.shape
+        qkv = self.to_qkv(x).chunk(3, dim=1)
+        q, k, v = map(
+            lambda t: rearrange(t, "b (h c) x y -> b h c (x y)", h=self.heads), qkv
+        )
+
+        q = q.softmax(dim=-2)
+        k = k.softmax(dim=-1)
+
+        q = q * self.scale
+        context = torch.einsum("b h d n, b h e n -> b h d e", k, v)
+
+        out = torch.einsum("b h d e, b h d n -> b h e n", context, q)
+        out = rearrange(out, "b h c (x y) -> b (h c) x y", h=self.heads, x=h, y=w)
+
+        return self.to_out(out)
+
+class CrossAttention(nn.Module):
+    def __init__(self, dim_x, dim_y, heads=4, dim_head=32):
+        super().__init__()
+        self.scale = dim_head**-0.5
+        self.heads = heads
+        hidden_dim = dim_head * heads
+
+        self.to_qkx = nn.Conv2d(dim_x, hidden_dim * 2, 1, bias=False)
+        self.to_qky = nn.Conv2d(dim_y, hidden_dim * 2, 1, bias=False)
+        self.to_v = nn.Conv2d(dim_y, hidden_dim, 1, bias=False)
+
+        self.to_out = nn.Conv2d(hidden_dim, dim_x, 1)
+
+    def forward(self, x, ,y):
+        bx, cx, hw, wx = x.shape
+        by, cy, hy, wy = y.shape
+
+        qkx = self.to_qkx(x).chunk(2, dim=1)
+        qky, vy = self.to_qky(y), self.to_v(y)
+
+        qkx = map(lambda t: rearrange(t, "b (h c) x y -> b h c (x y)", h=self.heads), qkx)
+        qky, vk = map(lambda t: rearrange(t, "b (h c) x y -> b h c (x y)", h=self.heads), (qky, vk))
+
+        qkx = qkx[0] * self.scale
+        qky = qky * self.scale
+
+        sim = einsum("b h d i, b h d j -> b h i j", qkx, qky)
+        sim = sim - sim.amax(dim=-1, keepdim=True).detach()
+        attn = sim.softmax(dim=-1)
+
+        out = einsum("b h i j, b h d j -> b h i d", attn, vk)
+        out = rearrange(out, "b h (x y) d -> b (h d) x y", x=hx, y=wx)
+
+        return self.to_out(out)
