@@ -14,6 +14,8 @@ This file defines different building blocks for the
 U-net architecture that can be used, with the goal of
 being as modular as possible (hotswap in blocks in
 and out). 
+# There is (Raayan) an error with github. 
+# I'm checking if I have permissions.
 
 I use snake_case convention for variable, function and method names
 I use PascalCase for class names
