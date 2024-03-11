@@ -15,7 +15,7 @@ To get started with Diffusion-IIG, you'll need to have Python 3.6+ and PyTorch 1
 1. `git clone Diffusion-IIG`
 2. Run the following:
 ```bash
-conda create Diffusion_IIG python=3.9.3 ipython
+conda create Diffusion_IIG python=3.11.5 ipython
 conda activate Diffusion_IIG
 pip install -r requirements.txt
 ```

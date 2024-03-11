@@ -1,4 +1,4 @@
-from unet_modules import *
+from models.unet_modules import *
 import torch
 import torch.nn as nn
 from functools import partial
