@@ -2,6 +2,12 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import einops
+from torch import einsum
+from einops import rearrange, reduce, repeat
+from einops.layers.torch import Rearrange, Reduce
+from functools import partial
+import types
+import math
 
 """
 This file defines different building blocks for the
@@ -20,7 +26,7 @@ def exists(x):
 def default(val, d):
     if exists(val):
         return val
-    return d() if isfunction(d) else d
+    return d() if callable(d) else d
 
 """
 More standard Unet blocks are defined below
@@ -99,7 +105,7 @@ class UpSample(nn.Module):
     def __init__(self, dim_in, dim_out):
         super(UpSample, self).__init__()
         self.upsample = nn.Sequential(
-            nn.UpSample(scale_factor=2, mode='nearest'),
+            nn.Upsample(scale_factor=2, mode='nearest'),
             nn.Conv2d(dim_in, default(dim_out, dim_in), 3, padding=1),
         )
 
@@ -111,9 +117,14 @@ class DownSample(nn.Module):
     def __init__(self, dim_in, dim_out=None):
         super(DownSample, self).__init__()
         self.downsample = nn.Sequential(
+            # doing some debugging
             Rearrange("b c (h p1) (w p2) -> b (c p1 p2) h w", p1=2, p2=2),
             nn.Conv2d(dim_in * 4, default(dim_out, dim_in), 1),
         )
+
+    def forward(self, x): 
+        print('intermediate x shape', x.shape) # DEBUG
+        return self.downsample(x)
 
 
 """
@@ -165,7 +176,7 @@ class WideUnweightedResNetBlock(nn.Module):
 
         self.block1 = WideUnweightedBlock(dim_in, dim_out)
         self.block2 = WideUnweightedBlock(dim_out, dim_out)
-        self.res_conv = nn.Conv2d(dim_in, dim_out, 1) if dim! = dim_out else nn.Identity()
+        self.res_conv = nn.Conv2d(dim_in, dim_out, 1) if dim != dim_out else nn.Identity()
 
     def forward(self, x, time_emb=None):
         scale_shift = None
@@ -221,6 +232,8 @@ class WideWeightedBlock(nn.Module):
         if exists(scale_shift):
             scale, shift = scale_shift
             x = x * (scale + 1) + shift
+        else:
+            None
 
         x = self.act(x)
         return x
@@ -238,12 +251,13 @@ class WideWeightedResNetBlock(nn.Module):
         
         self.block1 = WideWeightedBlock(dim_in, dim_out, groups=groups)
         self.block2 = WideWeightedBlock(dim_out, dim_out, groups=groups)
-        self.res_conv = nn.Conv2d(dim_in, dim_out, 1) if dim != dim_out else nn.Identity()
+        self.res_conv = nn.Conv2d(dim_in, dim_out, 1) if dim_in != dim_out else nn.Identity()
 
     def forward(self, x, time_emb=None):
         scale_shift = None
         if exists(self.mlp) and exists(time_emb):
             time_emb = self.mlp(time_emb)
+            print("Time emb shape", time_emb.shape) # DEBUG
             time_emb = rearrange(time_emb, "b c -> b c 1 1")
             scale_shift = time_emb.chunk(2, dim=1)
 
@@ -281,6 +295,7 @@ class SinusoidalPositionEmbeddings(nn.Module):
 
     def forward(self, time):
         device = time.device
+        print("time shape", time.shape)
         half_dim = self.dim // 2
         embeddings = math.log(10000) / (half_dim - 1)
         embeddings = torch.exp(torch.arange(half_dim, device=device) * -embeddings)
@@ -407,7 +422,7 @@ class CrossAttention(nn.Module):
 
         self.to_out = nn.Conv2d(hidden_dim, dim_x, 1)
 
-    def forward(self, x, ,y):
+    def forward(self, x, y):
         bx, cx, hw, wx = x.shape
         by, cy, hy, wy = y.shape
 
