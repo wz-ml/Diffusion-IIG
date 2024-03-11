@@ -56,9 +56,10 @@ class KarrasUNet(nn.Module):
             channels=3,
             self_condition=False,
             resnet_block_groups=4,
+            debug = False
     ):
         super().__init__()
-
+        self.debug = debug
         self.channels = channels
         self.self_condition = self_condition
         input_channels = channels * (2 if self_condition else 1)
@@ -72,7 +73,7 @@ class KarrasUNet(nn.Module):
         block_klass = partial(WideWeightedResNetBlock, groups=resnet_block_groups)
 
         time_dim = dim * 4
-        print("Dim shape:", dim) # DEBUG
+        if self.debug: print("Dim shape:", dim) # DEBUG
 
         # drop in different position embeddings here!
         self.time_mlp = nn.Sequential(
@@ -167,7 +168,7 @@ class KarrasUNet(nn.Module):
         x = torch.cat((x, r), dim=1)
 
         x = self.final_res_block(x, t)
-        print("output shape", x.shape) # DEBUG
+        if self.debug: print("output shape", x.shape) # DEBUG
 
         return self.final_conv(x)
     

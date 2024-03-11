@@ -125,7 +125,7 @@ class DownSample(nn.Module):
         )
 
     def forward(self, x): 
-        print('intermediate x shape', x.shape) # DEBUG
+        # print('intermediate x shape', x.shape) # DEBUG
         return self.downsample(x)
 
 
@@ -259,7 +259,7 @@ class WideWeightedResNetBlock(nn.Module):
         scale_shift = None
         if exists(self.mlp) and exists(time_emb):
             time_emb = self.mlp(time_emb)
-            print("Time emb shape", time_emb.shape) # DEBUG
+            #  print("Time emb shape", time_emb.shape) # DEBUG
             time_emb = rearrange(time_emb, "b c -> b c 1 1")
             scale_shift = time_emb.chunk(2, dim=1)
 
@@ -297,7 +297,7 @@ class SinusoidalPositionEmbeddings(nn.Module):
 
     def forward(self, time):
         device = time.device
-        print("time shape", time.shape)
+        #  print("time shape", time.shape)
         half_dim = self.dim // 2
         embeddings = math.log(10000) / (half_dim - 1)
         embeddings = torch.exp(torch.arange(half_dim, device=device) * -embeddings)

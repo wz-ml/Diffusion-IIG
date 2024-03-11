@@ -22,13 +22,11 @@ import random
 class Datamodule():
     """Generic class for datamodule. Don't use!"""
     def __init__(self, data_path, batch_size, train=True, shuffle=True):
-        self.data_path = data_path
+        self.data_path = os.path.join("..", data_path)
         self.batch_size = batch_size
         self.train = train
         self.shuffle = shuffle
         self.transform = None
-        self.dataset = datasets.ImageFolder(self.data_path, transform=self.transform)
-        self.dataloader = DataLoader(self.dataset, batch_size=self.batch_size, shuffle=self.shuffle)
 
 class MNISTDatamodule(Datamodule):
     def __init__(self, data_path, batch_size, train=True, shuffle=True, transform = None):
@@ -42,7 +40,7 @@ class MNISTDatamodule(Datamodule):
         self.dataset = datasets.MNIST(self.data_path, train=self.train, transform=self.transform, download=True)
         self.dataloader = DataLoader(self.dataset, batch_size=self.batch_size, shuffle=self.shuffle)
 
-class CIFAR10Datamodule():
+class CIFAR10Datamodule(Datamodule):
     def __init__(self, data_path, batch_size, train=True, shuffle=True):
         super().__init__(data_path, batch_size, train, shuffle)
         self.transform = transforms.Compose([
