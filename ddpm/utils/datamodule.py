@@ -35,7 +35,8 @@ class MNISTDatamodule(Datamodule):
             transforms.ToTensor(),
             transforms.Normalize((0.5,), (0.5,)),
             # Repeat across 3 channels
-            transforms.Lambda(lambda x: x.repeat(3, 1, 1))
+            transforms.Lambda(lambda x: x.repeat(3, 1, 1)),
+            transforms.Resize((32, 32))
         ])
         self.dataset = datasets.MNIST(self.data_path, train=self.train, transform=self.transform, download=True)
         self.dataloader = DataLoader(self.dataset, batch_size=self.batch_size, shuffle=self.shuffle)
@@ -45,7 +46,8 @@ class CIFAR10Datamodule(Datamodule):
         super().__init__(data_path, batch_size, train, shuffle)
         self.transform = transforms.Compose([
             transforms.ToTensor(),
-            transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))
+            transforms.RandomHorizontalFlip(),
+            transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5)), # Normalize to [-1, 1]
         ])
         self.dataset = datasets.CIFAR10(self.data_path, train=self.train, transform=self.transform, download=True)
         self.dataloader = DataLoader(self.dataset, batch_size=self.batch_size, shuffle=self.shuffle)
