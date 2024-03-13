@@ -22,10 +22,10 @@ pip install -r requirements.txt
 
 
 ## Todo:
-- [] Implement PixelCNN benchmark.
-- [] Implement DDPM benchmark.
+- [ ] Implement PixelCNN benchmark. TODO: Done, integrate notebook with main repo.
+- [x] Implement DDPM benchmark.
     - [x] Noise scheduler library.
-    - [] Sampler library.
-- [] Implement DDIM benchmark.
+    - [ ] Sampler library.
+- [ ] Implement DDIM benchmark.
     - [x] UNet architecture.
-    - [] Training loop.
+    - [x] Training loop.
