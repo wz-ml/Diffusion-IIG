@@ -41,7 +41,7 @@ from utils.tools import get_arrs, timestep_to_tensor, show_tensor
 from train.diffusion_process import forward_diffuse
 
 FORWARD_STEPS = 1000
-scheduler_dict = get_arrs(quadratic_beta_schedule, device, forward_steps=FORWARD_STEPS)
+scheduler_dict = get_arrs(sigmoid_beta_schedule, device, forward_steps=FORWARD_STEPS)
 
 _, HEIGHT, WIDTH, CHANNELS = next(iter(train_dm.dataloader))[0].shape
 print("Typical image shape:", (HEIGHT, WIDTH, CHANNELS))
