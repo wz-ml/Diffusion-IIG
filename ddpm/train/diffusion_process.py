@@ -111,8 +111,8 @@ def DDIM_denoising_process(shape, scheduler_dict, model, eta = 0, backward_steps
     temp_scheduler_dict["alphas_cumprod_prev"] = alphas_cumprod_prev
 
     # Generate sigma schedule
-    first_elem = torch.sqrt((1 - scheduler_dict["alphas_cumprod_prev"]) / (1 - scheduler_dict["alphas_cumprod"]))
-    second_elem = torch.sqrt(1 - scheduler_dict["alphas_cumprod"] / scheduler_dict["alphas_cumprod_prev"])
+    first_elem = torch.sqrt((1 - temp_scheduler_dict["alphas_cumprod_prev"]) / (1 - temp_scheduler_dict["alphas_cumprod"]))
+    second_elem = torch.sqrt(1 - temp_scheduler_dict["alphas_cumprod"] / temp_scheduler_dict["alphas_cumprod_prev"])
     sigmas = eta * first_elem * second_elem
     assert sigmas.shape == (forward_steps, 1, 1, 1)
 
