@@ -66,3 +66,26 @@ def DDPM_denoising_process(shape, scheduler_dict, model, forward_steps = 1000, d
                                  scheduler_dict, model)
         ims.append(im)
     return torch.stack(ims)
+
+#to be adjusted for skipping steps
+def DDIM_denoising_step(x_t, t, scheduler_dict, model, sigma = 0):
+    with torch.no_grad():
+        # TODO: Non-deterministic sampling with nonzero sigma
+        batch_size, channels, height, width = x_t.shape
+        epsilon_theta = model(x_t, t)
+        first_term = scheduler_dict["alphas_cumprod_prev"].sqrt() * (x_t - scheduler_dict["betas"][t] * epsilon_theta) / scheduler_dict["alphas"][t].sqrt()
+        second_term = (1 - scheduler_dict["alphas_prev"]).sqrt() * epsilon_theta
+        # Shape: (B, 1, 1, 1)
+        x_t_minus_1 = first_term + second_term
+        assert t.shape == (batch_size,)
+        return x_t_minus_1
+
+#to be adjusted for skipping steps
+def DDIM_denoising_process(shape, scheduler_dict, model, forward_steps = 1000,device = None):
+    im = torch.randn(shape, device = device) # Noise sampled from N(0, I)
+    ims = [im]
+    for step in tqdm(list(reversed(range(0, forward_steps, 4)))):
+        im = DDIM_denoising_step(im, torch.ones(shape[0], device = device, dtype=torch.long) * step,
+                                 scheduler_dict, model)
+        ims.append(im)
+    return torch.stack(ims)
