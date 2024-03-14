@@ -51,3 +51,14 @@ class CIFAR10Datamodule(Datamodule):
         ])
         self.dataset = datasets.CIFAR10(self.data_path, train=self.train, transform=self.transform, download=True)
         self.dataloader = DataLoader(self.dataset, batch_size=self.batch_size, shuffle=self.shuffle)
+
+class AnimeDataModule(Datamodule):
+    def __init__(self, data_path, batch_size, train=True, shuffle=True, image_size = 64):
+        super().__init__(data_path, batch_size, train, shuffle)
+        self.transform = transforms.Compose([
+            transforms.ToTensor(),
+            transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5)), # Normalize to [-1, 1]
+            transforms.Resize((image_size, image_size))
+        ])
+        self.dataset = datasets.ImageFolder(self.data_path, transform=self.transform)
+        self.dataloader = DataLoader(self.dataset, batch_size=self.batch_size, shuffle=self.shuffle)
