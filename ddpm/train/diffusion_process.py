@@ -58,8 +58,10 @@ def DDPM_denoising_step(x_t, t, scheduler_dict, model):
         assert t.shape == (batch_size,)
         return x_t_minus_1
     
-def DDPM_denoising_process(shape, scheduler_dict, model, forward_steps = 1000, device = None):
-    im = torch.randn(shape, device = device) # Noise sampled from N(0, I)
+def DDPM_denoising_process(shape, scheduler_dict, model, forward_steps = 1000, device = None,
+                           noise = None):
+    if noise is None: im = torch.randn(shape, device = device) # Noise sampled from N(0, I)
+    else: im = noise
     ims = [im]
     for step in tqdm(list(reversed(range(0, forward_steps)))):
         im = DDPM_denoising_step(im, torch.ones(shape[0], device = device, dtype=torch.long) * step,
@@ -67,25 +69,56 @@ def DDPM_denoising_process(shape, scheduler_dict, model, forward_steps = 1000, d
         ims.append(im)
     return torch.stack(ims)
 
-#to be adjusted for skipping steps
-def DDIM_denoising_step(x_t, t, scheduler_dict, model, sigma = 0):
+def DDIM_denoising_step(x_tau, tau, scheduler_dict, model, sigmas):
+    """
+    DDIM denoising process, as per the DDIM paper. Note that t is replaced by tau, since our reverse diffusion process
+    no longer takes exactly the same number of steps as our forward diffusion process.
+    """
     with torch.no_grad():
-        # TODO: Non-deterministic sampling with nonzero sigma
-        batch_size, channels, height, width = x_t.shape
-        epsilon_theta = model(x_t, t)
-        first_term = scheduler_dict["alphas_cumprod_prev"].sqrt() * (x_t - scheduler_dict["betas"][t] * epsilon_theta) / scheduler_dict["alphas"][t].sqrt()
-        second_term = (1 - scheduler_dict["alphas_prev"]).sqrt() * epsilon_theta
+        batch_size, channels, height, width = x_tau.shape
+        epsilon_theta = model(x_tau, tau)
+        numerator = x_tau - scheduler_dict["sqrt_one_minus_alphas_cumprod"][tau] * epsilon_theta
+        first_term = scheduler_dict["alphas_cumprod_prev"][tau].sqrt() * numerator / scheduler_dict["sqrt_alphas_cumprod"][tau]
+        second_term = torch.sqrt(1 - scheduler_dict["alphas_cumprod_prev"][tau] - sigmas[tau]**2) * epsilon_theta
+
+        z = torch.randn(x_tau.shape, device = epsilon_theta.device) * expand_dims(tau > 0) # binary mask  
+
+        third_term = sigmas[tau] * z
         # Shape: (B, 1, 1, 1)
-        x_t_minus_1 = first_term + second_term
-        assert t.shape == (batch_size,)
+        x_t_minus_1 = first_term + second_term + third_term
+        assert tau.shape == (batch_size,)
         return x_t_minus_1
 
-#to be adjusted for skipping steps
-def DDIM_denoising_process(shape, scheduler_dict, model, forward_steps = 1000,device = None):
-    im = torch.randn(shape, device = device) # Noise sampled from N(0, I)
+def DDIM_denoising_process(shape, scheduler_dict, model, eta = 0, backward_steps = 100, forward_steps = 1000, device = None,
+                           noise = None):
+    """
+    Important args:
+        - shape: shape of the image. (batch, channel, height, width)
+        - scheduler_dict: See forward_diffuse.
+        - eta: DDIM sampling noise schedule. An eta of 0 makes the forward process deterministic.
+        - noise: For interpolation. If not None, noise is randomly sampled. Shape: (batch, channel, height, width)
+    """
+    assert forward_steps % backward_steps == 0, "forward_steps must be divisible by backward_steps (interpolation not yet implemented)"
+    steps_forward = forward_steps // backward_steps
+    if noise is None: im = torch.randn(shape, device = device) # Noise sampled from N(0, I)
+    else: im = noise
+
+    # Add alphas_cumprod_prev to scheduler_dict
+    temp_scheduler_dict = scheduler_dict.copy()
+    alphas_cumprod_prev = torch.cat([torch.tensor([1. for i in range(steps_forward)], device = device, dtype = torch.float32), 
+                                     scheduler_dict["alphas_cumprod"][:-steps_forward].squeeze()], dim = 0)
+    alphas_cumprod_prev = expand_dims(alphas_cumprod_prev)
+    temp_scheduler_dict["alphas_cumprod_prev"] = alphas_cumprod_prev
+
+    # Generate sigma schedule
+    first_elem = torch.sqrt((1 - scheduler_dict["alphas_cumprod_prev"]) / (1 - scheduler_dict["alphas_cumprod"]))
+    second_elem = torch.sqrt(1 - scheduler_dict["alphas_cumprod"] / scheduler_dict["alphas_cumprod_prev"])
+    sigmas = eta * first_elem * second_elem
+    assert sigmas.shape == (forward_steps, 1, 1, 1)
+
     ims = [im]
-    for step in tqdm(list(reversed(range(0, forward_steps, 4)))):
+    for step in tqdm(list(reversed(range(0, forward_steps, steps_forward)))):
         im = DDIM_denoising_step(im, torch.ones(shape[0], device = device, dtype=torch.long) * step,
-                                 scheduler_dict, model)
+                                 temp_scheduler_dict, model, sigmas = sigmas)
         ims.append(im)
     return torch.stack(ims)

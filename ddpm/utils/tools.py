@@ -30,6 +30,7 @@ def get_arrs(beta_schedule, device = None, forward_steps = 1000):
     alphas = 1 - betas
     alphas_cumprod = torch.cumprod(alphas, dim = 0)
     alphas_cumprod_prev = torch.cat([torch.tensor([1.]), alphas_cumprod[:-1]], dim = 0) # Shift one to the left
+    # ^ Note: not the same as the one used in DDIMs. DDPM formulation ONLY.
     sqrt_recip_alphas = torch.sqrt(1 / alphas)
 
     variances = betas * (1 - alphas_cumprod_prev) / (1 - alphas_cumprod)
